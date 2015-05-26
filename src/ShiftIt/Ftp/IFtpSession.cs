@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace ShiftIt.Ftp
 {
@@ -112,15 +113,20 @@ namespace ShiftIt.Ftp
 		/// Always resets file's download progress.
 		/// </summary>
 		/// <param name="remFileName">Name of file on remote server</param>
-		void Download (string remFileName);
+		void DownloadFile (string remFileName);
 
 		/// <summary>
-		/// Download a remote file to the Assembly's local directory,
-		/// keeping the same file name, and set the resume flag.
+		/// Download a remote file to a byte array, and set the resume flag.
 		/// </summary>
 		/// <param name="remFileName">Name of file on remote server</param>
 		/// <param name="resume">if true, try to continue a previous download</param>
-		void Download (string remFileName, Boolean resume);
+        void Download(string remFileName, Stream output, Boolean resume);
+
+		/// <summary>
+		/// Download a remote file to a byte array, and set the resume flag.
+		/// </summary>
+		/// <param name="remFileName">Name of file on remote server</param>
+		byte[] DownloadBytes (string remFileName);
 
 		/// <summary>
 		/// Download a remote file to a local file name which can include
@@ -129,7 +135,7 @@ namespace ShiftIt.Ftp
 		/// </summary>
 		/// <param name="locFileName">Local file name (may be a full path)</param>
 		/// <param name="remFileName">Remote file name</param>
-		void Download (string remFileName, string locFileName);
+		void DownloadFile (string remFileName, string locFileName);
 
 		/// <summary>
 		/// Download a remote file to a local file name which can include
@@ -139,20 +145,20 @@ namespace ShiftIt.Ftp
 		/// <param name="locFileName">Local file name (may be a full path)</param>
 		/// <param name="remFileName">Remote file name</param>
 		/// <param name="resume">if true, try to continue a previous download</param>
-		void Download (string remFileName, string locFileName, Boolean resume);
+		void DownloadFile (string remFileName, string locFileName, Boolean resume);
 
 		/// <summary>
 		/// Upload a file to the current remote directory.
 		/// </summary>
 		/// <param name="fileName">Full local path and filename to upload</param>
-		void Upload (string fileName);
+		void UploadFile (string fileName);
 
 		/// <summary>
 		/// Upload a file to the current remote directory.
 		/// </summary>
 		/// <param name="fileName">Full local path and filename to upload</param>
 		/// <param name="resume">Resume partial upload if possible</param>
-		void Upload (string fileName, Boolean resume);
+		void UploadFile (string fileName, Boolean resume);
 
 		/// <summary>
 		/// Upload a file and set the resume flag.
@@ -160,7 +166,22 @@ namespace ShiftIt.Ftp
 		/// <param name="fileName">Full local path and filename to upload</param>
 		/// <param name="remoteFileName">file name as it should be on the remote server</param>
 		/// <param name="resume">if true, try to continue a previous upload</param>
-		void Upload (string fileName, string remoteFileName, Boolean resume);
+		void UploadFile (string fileName, string remoteFileName, Boolean resume);
+
+	    /// <summary>
+	    /// Upload a file and set the resume flag.
+	    /// </summary>
+	    /// <param name="remoteFileName">file name as it should be on the remote server</param>
+	    /// <param name="bytes"></param>
+	    /// <param name="resume">if true, try to continue a previous upload</param>
+	    void UploadBytes (string remoteFileName, byte[] bytes, Boolean resume);
+
+	    /// <summary>
+	    /// Upload a file and set the resume flag.
+	    /// </summary>
+	    /// <param name="remoteFileName">file name as it should be on the remote server</param>
+	    /// <param name="bytes"></param>
+	    void UploadBytes (string remoteFileName, byte[] bytes);
 
 		/// <summary>
 		/// Delete a file from the remote FTP server.

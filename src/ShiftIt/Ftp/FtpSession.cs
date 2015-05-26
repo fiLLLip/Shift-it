@@ -299,40 +299,54 @@ namespace ShiftIt.Ftp {
 		/// Always resets file's download progress.
 		/// </summary>
 		/// <param name="remFileName">Name of file on remote server</param>
-		public void Download (string remFileName) {
-			Download(remFileName, "", false);
+		public void DownloadFile (string remFileName) {
+			DownloadFile(remFileName, "", false);
 		}
 
-		/// <summary>
-		/// Download a remote file to the Assembly's local directory,
-		/// keeping the same file name, and set the resume flag.
-		/// </summary>
-		/// <param name="remFileName">Name of file on remote server</param>
-		/// <param name="resume">if true, try to continue a previous download</param>
-		public void Download (string remFileName, Boolean resume) {
-			Download(remFileName, "", resume);
-		}
+	    public byte[] DownloadBytes(string remFileName)
+	    {
+	        using (var stream = new MemoryStream())
+	        {
+	            Download(remFileName, stream, false);
+	            return stream.ToArray();
+	        }
+	    }
 
-		/// <summary>
+	    /// <summary>
 		/// Download a remote file to a local file name which can include
 		/// a path. The local file name will be created or overwritten,
 		/// but the path must exist.
 		/// </summary>
 		/// <param name="locFileName">Local file name (may be a full path)</param>
 		/// <param name="remFileName">Remote file name</param>
-		public void Download (string remFileName, string locFileName) {
-			Download(remFileName, locFileName, false);
+		public void DownloadFile (string remFileName, string locFileName) {
+			DownloadFile(remFileName, locFileName, false);
 		}
 
-		/// <summary>
+
+	    public void DownloadFile(string remFileName, string locFileName, Boolean resume)
+	    {
+            if (locFileName.Equals(""))
+            {
+                locFileName = remFileName;
+            }
+
+	        using (var output = new FileStream(locFileName, FileMode.OpenOrCreate))
+	        {
+	            Download(remFileName, output, resume);
+	        }
+	    }
+
+	    /// <summary>
 		/// Download a remote file to a local file name which can include
 		/// a path, and set the resume flag. The local file name will be
 		/// created or overwritten, but the path must exist.
 		/// </summary>
 		/// <param name="locFileName">Local file name (may be a full path)</param>
-		/// <param name="remFileName">Remote file name</param>
+        /// <param name="output">Stream to write to</param>
 		/// <param name="resume">if true, try to continue a previous download</param>
-		public void Download (string remFileName, string locFileName, Boolean resume) {
+        public void Download(string remFileName, Stream output, Boolean resume)
+        {
 			if (!_logined) {
 				Login();
 			}
@@ -341,18 +355,6 @@ namespace ShiftIt.Ftp {
 
 			Console.WriteLine("Downloading file " + remFileName + " from " + _remoteHost + "/" + _remotePath);
 
-			if (locFileName.Equals("")) {
-				locFileName = remFileName;
-			}
-
-			if (!File.Exists(locFileName)) {
-			    using (Stream st = File.Create(locFileName))
-			    {
-                    // This assures it closes the stream
-			    }
-			}
-
-            using (var output = new FileStream(locFileName, FileMode.Open))
             using (var cSocket = CreateDataSocket())
             {
                 if (resume)
@@ -415,8 +417,8 @@ namespace ShiftIt.Ftp {
 		/// Upload a file to the current remote directory.
 		/// </summary>
 		/// <param name="fileName">Full local path and filename to upload</param>
-		public void Upload (string fileName) {
-			Upload(fileName, false);
+		public void UploadFile (string fileName) {
+			UploadFile(fileName, false);
 		}
 
 		/// <summary>
@@ -424,8 +426,8 @@ namespace ShiftIt.Ftp {
 		/// </summary>
 		/// <param name="fileName">Full local path and filename to upload</param>
 		/// <param name="resume">Resume partial upload if possible</param>
-		public void Upload (string fileName, Boolean resume) {
-			Upload(fileName, Path.GetFileName(fileName), resume);
+		public void UploadFile (string fileName, Boolean resume) {
+			UploadFile(fileName, Path.GetFileName(fileName), resume);
 		}
 
 		/// <summary>
@@ -434,80 +436,113 @@ namespace ShiftIt.Ftp {
 		/// <param name="fileName">Full local path and filename to upload</param>
 		/// <param name="remoteFileName">file name as it should be on the remote server</param>
 		/// <param name="resume">if true, try to continue a previous upload</param>
-		public void Upload (string fileName, string remoteFileName, Boolean resume) {
-			ShouldContinue = false;
-			var dest = remoteFileName.Replace("/", "");
-			if (!_logined) {
-				Login();
-			}
-
-			var cSocket = (PassiveMode) ? (CreateDataSocket()) : (CreateDataPort());
-			cSocket.SendTimeout = cSocket.ReceiveTimeout = 30000;
-			long offset = 0;
-
-			if (resume) {
-
-				try {
-
-					SetBinaryMode(true);
-					offset = GetFileSize(dest);
-					Console.WriteLine("Resuming upload from " + offset);
-				} catch (Exception) {
-					offset = 0;
-					Console.WriteLine("Failed to get offset, resending whole file ");
-				}
-			}
-
-			if (offset > 0) {
-				ShouldContinue = true;
-				SendCommand("REST " + offset);
-				if (_retValue != 350) {
-					//Remote server may not support resuming.
-// ReSharper disable RedundantAssignment
-					offset = 0;
-// ReSharper restore RedundantAssignment
-				}
-			}
-
-			// Note: must strip stray slashes out of the name, otherwise
-			// FTP server will regard this as an absolute path.
-			SendCommand("STOR " + dest);
-
-
-			if (!(_retValue == 125 || _retValue == 150)) {
-				ShouldContinue = false;
-				throw new IOException(_reply.Substring(4), _retValue);
-			}
-
-			if (!PassiveMode) {
-				var old = cSocket;
-				cSocket = old.Accept(); // This is blocking. Will wait for a LONG time!
-				old.Close();
-			}
-			cSocket.SendTimeout = cSocket.ReceiveTimeout = 30000;
-
+		public void UploadFile (string fileName, string remoteFileName, Boolean resume) {
 			// open input stream to read source file
 			if (!File.Exists(fileName)) throw new IOException("Specified local file not accessible");
 
 			Console.WriteLine("Uploading file " + fileName + " to " + _remotePath + " as " + remoteFileName);
-			cSocket.SendFile(fileName);
-			cSocket.Disconnect(false);
 
-			Console.WriteLine("");
-
-			if (cSocket.Connected) {
-				cSocket.Close();
-			}
-
-			ShouldContinue = false; // all data sent
-			ReadReply();
-
-			if (!(_retValue == 226 || _retValue == 250)) {
-				throw new IOException(_reply.Substring(4), _retValue);
-			}
+		    using (var stream = File.OpenRead(fileName))
+            using (var memStream = new MemoryStream())
+		    {
+		        while (stream.CanRead)
+		        {
+		            memStream.WriteByte((byte)stream.ReadByte());
+		        }
+                UploadBytes(remoteFileName, memStream.ToArray(), resume);
+		    }
 		}
 
-		/// <summary>
+	    public void UploadBytes(string remoteFileName, byte[] bytes, bool resume)
+        {
+            ShouldContinue = false;
+            var dest = remoteFileName.Replace("/", "");
+            if (!_logined)
+            {
+                Login();
+            }
+
+            var cSocket = (PassiveMode) ? (CreateDataSocket()) : (CreateDataPort());
+            cSocket.SendTimeout = cSocket.ReceiveTimeout = 30000;
+            long offset = 0;
+
+            if (resume)
+            {
+
+                try
+                {
+
+                    SetBinaryMode(true);
+                    offset = GetFileSize(dest);
+                    Console.WriteLine("Resuming upload from " + offset);
+                }
+                catch (Exception)
+                {
+                    offset = 0;
+                    Console.WriteLine("Failed to get offset, resending whole file ");
+                }
+            }
+
+            if (offset > 0)
+            {
+                ShouldContinue = true;
+                SendCommand("REST " + offset);
+                if (_retValue != 350)
+                {
+                    //Remote server may not support resuming.
+                    // ReSharper disable RedundantAssignment
+                    offset = 0;
+                    // ReSharper restore RedundantAssignment
+                }
+            }
+
+            // Note: must strip stray slashes out of the name, otherwise
+            // FTP server will regard this as an absolute path.
+            SendCommand("STOR " + dest);
+
+
+            if (!(_retValue == 125 || _retValue == 150))
+            {
+                ShouldContinue = false;
+                throw new IOException(_reply.Substring(4), _retValue);
+            }
+
+            if (!PassiveMode)
+            {
+                var old = cSocket;
+                cSocket = old.Accept(); // This is blocking. Will wait for a LONG time!
+                old.Close();
+            }
+            cSocket.SendTimeout = cSocket.ReceiveTimeout = 30000;
+
+            Console.WriteLine("Uploading to " + _remotePath + " as " + remoteFileName);
+
+	        cSocket.Send(bytes);
+
+            cSocket.Disconnect(false);
+
+            Console.WriteLine("");
+
+            if (cSocket.Connected)
+            {
+                cSocket.Close();
+            }
+
+            ShouldContinue = false; // all data sent
+            ReadReply();
+
+            if (!(_retValue == 226 || _retValue == 250))
+            {
+                throw new IOException(_reply.Substring(4), _retValue);
+            }
+	    }
+
+	    public void UploadBytes(string remoteFileName, byte[] bytes)
+	    {
+            UploadBytes(remoteFileName, bytes, false);
+	    }
+
+	    /// <summary>
 		/// Delete a file from the remote FTP server.
 		/// </summary>
 		/// <param name="fileName">File in the current remote directory</param>
