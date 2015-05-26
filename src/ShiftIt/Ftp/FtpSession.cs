@@ -346,64 +346,69 @@ namespace ShiftIt.Ftp {
 			}
 
 			if (!File.Exists(locFileName)) {
-				Stream st = File.Create(locFileName);
-				st.Close();
+			    using (Stream st = File.Create(locFileName))
+			    {
+                    // This assures it closes the stream
+			    }
 			}
 
-			var output = new FileStream(locFileName, FileMode.Open);
+            using (var output = new FileStream(locFileName, FileMode.Open))
+            using (var cSocket = CreateDataSocket())
+            {
+                if (resume)
+                {
 
-			var cSocket = CreateDataSocket();
+                    long offset = output.Length;
 
-			if (resume) {
+                    if (offset > 0)
+                    {
+                        SendCommand("REST " + offset);
+                        if (_retValue != 350)
+                        {
+                            //Some servers may not support resuming.
+                            offset = 0;
+                        }
+                    }
 
-				long offset = output.Length;
+                    if (offset > 0)
+                    {
+                        if (_debug)
+                        {
+                            Console.WriteLine("seeking to " + offset);
+                        }
+                        long npos = output.Seek(offset, SeekOrigin.Begin);
+                        Console.WriteLine("new pos=" + npos);
+                    }
+                }
 
-				if (offset > 0) {
-					SendCommand("REST " + offset);
-					if (_retValue != 350) {
-						//Some servers may not support resuming.
-						offset = 0;
-					}
-				}
+                SendCommand("RETR " + remFileName);
 
-				if (offset > 0) {
-					if (_debug) {
-						Console.WriteLine("seeking to " + offset);
-					}
-					long npos = output.Seek(offset, SeekOrigin.Begin);
-					Console.WriteLine("new pos=" + npos);
-				}
-			}
+                if (!(_retValue == 150 || _retValue == 125))
+                {
+                    throw new IOException(_reply.Substring(4), _retValue);
+                }
 
-			SendCommand("RETR " + remFileName);
+                while (true)
+                {
 
-			if (!(_retValue == 150 || _retValue == 125)) {
-				throw new IOException(_reply.Substring(4), _retValue);
-			}
+                    _bytes = cSocket.Receive(_buffer, _buffer.Length, 0);
+                    output.Write(_buffer, 0, _bytes);
 
-			while (true) {
+                    if (cSocket.Available < 1)
+                    {
+                        break;
+                    }
+                }
 
-				_bytes = cSocket.Receive(_buffer, _buffer.Length, 0);
-				output.Write(_buffer, 0, _bytes);
+                Console.WriteLine("");
 
-				if (cSocket.Available < 1) {
-					break;
-				}
-			}
+                ReadReply();
 
-			output.Close();
-			if (cSocket.Connected) {
-				cSocket.Close();
-			}
-
-			Console.WriteLine("");
-
-			ReadReply();
-
-			if (!(_retValue == 226 || _retValue == 250)) {
-				throw new IOException(_reply.Substring(4), _retValue);
-			}
-
+                if (!(_retValue == 226 || _retValue == 250))
+                {
+                    throw new IOException(_reply.Substring(4), _retValue);
+                }
+            }
 		}
 
 		/// <summary>
