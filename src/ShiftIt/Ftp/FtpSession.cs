@@ -440,7 +440,7 @@ namespace ShiftIt.Ftp {
 			// open input stream to read source file
 			if (!File.Exists(fileName)) throw new IOException("Specified local file not accessible");
 
-			Console.WriteLine("Uploading file " + fileName + " to " + _remotePath + " as " + remoteFileName);
+			Console.WriteLine("Preparing file " + fileName + " for upload");
 
 		    using (var stream = File.OpenRead(fileName))
             using (var memStream = new MemoryStream())
